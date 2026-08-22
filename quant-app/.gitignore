@@ -1,0 +1,26 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android / IDE
+local.properties
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 密钥与签名(切勿上传)
+*.jks
+*.keystore
+*.p12
+*.key
+secrets.properties
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
