@@ -1,0 +1,96 @@
+name: Unpack archives
+
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: 'Path to search for archives'
+        required: false
+        default: '.'
+      pattern:
+        description: 'Comma-separated glob patterns to match files (bash globs, supports **)'
+        required: false
+        default: '**/*.{zip,tar.gz,tar.bz2,tar.xz,7z}'
+      destination:
+        description: 'Destination directory for extracted files'
+        required: false
+        default: 'extracted'
+  push:
+    # Trigger when archive files are added/changed
+    paths:
+      - '**/*.zip'
+      - '**/*.tar.gz'
+      - '**/*.tgz'
+      - '**/*.tar.bz2'
+      - '**/*.tbz2'
+      - '**/*.tar.xz'
+      - '**/*.txz'
+      - '**/*.7z'
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip p7zip-full
+
+      - name: Find and extract archives
+        env:
+          SEARCH_PATH: ${{ github.event.inputs.path }}
+          PATTERN: ${{ github.event.inputs.pattern }}
+          DEST: ${{ github.event.inputs.destination }}
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob dotglob
+
+          SEARCH_PATH="${SEARCH_PATH:-.}"
+          PATTERN="${PATTERN:-**/*.{zip,tar.gz,tar.bz2,tar.xz,7z}}"
+          DEST="${DEST:-extracted}"
+
+          mkdir -p "$DEST"
+          IFS=',' read -ra PATTERNS <<< "$PATTERN"
+          count=0
+
+          for pat in "${PATTERNS[@]}"; do
+            # Trim whitespace from pattern
+            pat="${pat#"${pat%%[![:space:]]*}"}"
+            pat="${pat%"${pat##*[![:space:]]}"}"
+
+            for f in $SEARCH_PATH/$pat; do
+              [ -f "$f" ] || continue
+              echo "Extracting: $f"
+              base="$(basename "$f")"
+
+              # Remove common multi-part extensions to form directory name
+              dirname="$base"
+              dirname="${dirname%.tar.gz}"
+              dirname="${dirname%.tgz}"
+              dirname="${dirname%.tar.bz2}"
+              dirname="${dirname%.tbz2}"
+              dirname="${dirname%.tar.xz}"
+              dirname="${dirname%.txz}"
+              dirname="${dirname%.zip}"
+              dirname="${dirname%.7z}"
+
+              dest_dir="$DEST/$dirname"
+              mkdir -p "$dest_dir"
+
+              case "$f" in
+                *.zip) unzip -o "$f" -d "$dest_dir" ;;
+                *.tar.gz|*.tgz) tar -xzf "$f" -C "$dest_dir" ;;
+                *.tar.bz2|*.tbz2) tar -xjf "$f" -C "$dest_dir" ;;
+                *.tar.xz|*.txz) tar -xJf "$f" -C "$dest_dir" ;;
+                *.7z)  7z x -o"$dest_dir" "$f" ;;
+                *) echo "Unsupported archive type: $f" ;;
+              esac
+
+              count=$((count+1))
+            done
+          done
+
+          echo "Extracted $count archives to $DEST"
