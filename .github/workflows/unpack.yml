@@ -1,88 +1,43 @@
-name: Build Android APK
+name: Unpack quant-app.zip
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
     paths:
-      - 'quant-app/**'
-      - 'app/**'
+      - 'quant-app.zip'
+      - '.github/unpack-trigger'
 
 jobs:
-  build:
-    name: Build APK (debug & release)
+  unpack:
     runs-on: ubuntu-latest
-
-    env:
-      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+      - name: Ensure unzip is installed
+        run: sudo apt-get update && sudo apt-get install -y unzip
 
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Install Android SDK command-line tools
+      - name: Unzip quant-app.zip
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip
-          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-          cd "$ANDROID_SDK_ROOT/cmdline-tools"
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-          unzip -q cmdline-tools.zip
-          rm cmdline-tools.zip
-          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-          mv cmdline-tools/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/" || true
-          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-        shell: bash
-
-      - name: Show Java & SDK versions
-        run: |
-          java -version
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          ls -la "$ANDROID_SDK_ROOT"
-
-      - name: Make Gradle wrapper executable
-        run: |
-          if [ -f quant-app/gradlew ]; then
-            chmod +x quant-app/gradlew
-          elif [ -f gradlew ]; then
-            chmod +x gradlew
+          if [ -f quant-app.zip ]; then
+            unzip -o quant-app.zip -d .
+          else
+            echo "quant-app.zip not found in repo root" && exit 1
           fi
 
-      - name: Build debug APK
-        working-directory: quant-app
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
-
-      - name: Build release APK (unsigned)
-        working-directory: quant-app
-        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace || true
-
-      - name: Upload APK artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: apks
-          path: |
-            quant-app/app/build/outputs/**/*.apk
-            quant-app/app/build/outputs/**/*.aab
-
-      - name: List generated APKs
+      - name: Commit and push unpacked files
         run: |
-          echo "Artifacts in build outputs:"
-          ls -R quant-app/app/build/outputs || true
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add quant-app || true
+          git add quant-app/** || true
+          git add . || true
+          if git status --porcelain | grep -q .; then
+            git commit -m "Unpack quant-app.zip"
+            git push
+          else
+            echo "No changes to commit"
+          fi
