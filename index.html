@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="彩票分析">
+  <meta name="theme-color" content="#8b0000">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>🎱 极速彩数据分析 v5.4</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 顶部导航栏 -->
+  <header class="app-header">
+    <div class="header-title">🎱 彩析 v5.4</div>
+    <div class="header-right">
+      <button class="theme-btn" id="themeBtn" title="切换主题">🌙</button>
+      <select id="lotterySelect" class="lottery-select">
+        <option value="">选择彩种</option>
+      </select>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main class="app-content" id="appContent">
+    <!-- 骨架屏加载 -->
+    <div class="skeleton-container" id="skeletonContainer" style="display:none;">
+      <div class="skeleton-stats">
+        <div class="skeleton skeleton-stat"></div>
+        <div class="skeleton skeleton-stat"></div>
+        <div class="skeleton skeleton-stat"></div>
+      </div>
+      <div class="skeleton skeleton-live"></div>
+      <div class="skeleton skeleton-pred">
+        <div class="skeleton skeleton-pred-card"></div>
+        <div class="skeleton skeleton-pred-card"></div>
+      </div>
+    </div>
+
+    <!-- 加载中 -->
+    <div class="loading-container" id="loadingContainer">
+      <div class="spinner"></div>
+      <p>加载中...</p>
+    </div>
+
+    <!-- 错误提示 -->
+    <div class="error-container" id="errorContainer" style="display:none;">
+      <div class="error-title">⚠️ 数据加载失败</div>
+      <div id="errorMessage">请检查网络连接</div>
+      <button class="error-retry" onclick="loadData()">重新加载</button>
+    </div>
+
+    <!-- 首页内容 -->
+    <div class="page" id="pageHome" style="display:none;">
+      <!-- 免责声明 -->
+      <div class="disclaimer">
+        ⚠️ <b>重要声明</b>：开奖为随机事件，历史无法预测未来。本工具只做统计可视化，不提供中奖保证。模型经过 Bonferroni 多重比较校正，p值仅反映历史统计特征，不代表真实预测能力。请理性对待。
+      </div>
+
+      <!-- 数据统计 -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-label">已加载期数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statLatest">-</div>
+          <div class="stat-label">最新期号</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statTime">-</div>
+          <div class="stat-label">开奖时间</div>
+        </div>
+      </div>
+
+      <!-- 实时看板 -->
+      <div class="live-board" id="liveBoard">
+        <div class="live-placeholder">实时数据加载中...</div>
+      </div>
+
+      <!-- 倒计时 -->
+      <div class="countdown-box" id="countdownBox" style="display:none;">
+        <div class="countdown-label">⏳ 下期开奖　第 <span id="nextIssue">-</span> 期</div>
+        <div class="countdown-time" id="countdownTime">--:--</div>
+        <div class="countdown-sub">
+          预计 <span id="drawTime">--:--</span>
+          <span class="sep">·</span>
+          校对 <span id="serverTime">本地</span>
+        </div>
+      </div>
+
+      <!-- 预测面板 -->
+      <div class="section-title">📊 大小单双预测</div>
+
+      <!-- v5.0 新增：算法选择器 -->
+      <div class="algo-selector" id="algoSelector">
+        <button class="algo-tab" data-algo="experience" title="经验学习模式">
+          <span class="algo-tab-icon">🎯</span>
+          <span class="algo-tab-text">经验学习</span>
+        </button>
+        <button class="algo-tab" data-algo="pattern" title="历史对照模式">
+          <span class="algo-tab-icon">📊</span>
+          <span class="algo-tab-text">形态匹配</span>
+        </button>
+        <button class="algo-tab" data-algo="manual" title="手动标记模式">
+          <span class="algo-tab-icon">✍️</span>
+          <span class="algo-tab-text">手动标记</span>
+        </button>
+        <!-- v5.2 新增：智能融合 -->
+        <button class="algo-tab" data-algo="fusion" title="智能融合模式">
+          <span class="algo-tab-icon">🔮</span>
+          <span class="algo-tab-text">智能融合</span>
+        </button>
+        <button class="algo-tab algo-compare-btn" data-algo="compare" title="多算法对比">
+          <span class="algo-tab-icon">⚖️</span>
+          <span class="algo-tab-text">对比</span>
+        </button>
+      </div>
+
+      <!-- v5.0 新增：增强置信度显示 -->
+      <div class="confidence-banner" id="confidenceBanner" style="display:none;">
+        <div class="conf-level" id="confLevel">推荐</div>
+        <div class="conf-text" id="confText">预测倾向明显，可以参考</div>
+      </div>
+
+      <div class="pred-section" id="predSection">
+        <div class="loading-text">预测生成中...</div>
+      </div>
+
+      <!-- v5.0 新增：三算法对比面板 -->
+      <div class="algo-compare-panel" id="algoComparePanel" style="display:none;">
+        <div class="compare-header">
+          <span>多算法预测对比</span>
+          <span class="compare-hint" id="compareHint">点击切换主算法</span>
+        </div>
+        <div class="compare-grid" id="compareGrid">
+          <!-- 动态填充 -->
+        </div>
+      </div>
+
+      <!-- v5.2 新增：融合设置面板 -->
+      <div class="fusion-settings-panel" id="fusionSettingsPanel" style="display:none;">
+        <div class="fusion-settings-header" id="fusionSettingsToggle">
+          <span>🔮 融合设置</span>
+          <span class="fusion-toggle-icon">▼</span>
+        </div>
+        <div class="fusion-settings-body" id="fusionSettingsBody">
+          <!-- 融合策略选择 -->
+          <div class="fusion-section">
+            <div class="fusion-section-title">融合策略</div>
+            <div class="fusion-strategy-grid" id="fusionStrategyGrid">
+              <button class="fusion-strategy-btn active" data-strategy="ewma">
+                <span class="fs-icon">📈</span>
+                <span class="fs-name">EWMA自适应</span>
+                <span class="fs-desc">历史对错动态加权</span>
+              </button>
+              <button class="fusion-strategy-btn" data-strategy="equal">
+                <span class="fs-icon">⚖️</span>
+                <span class="fs-name">等权平均</span>
+                <span class="fs-desc">所有模型权重相同</span>
+              </button>
+              <button class="fusion-strategy-btn" data-strategy="confidence">
+                <span class="fs-icon">🎯</span>
+                <span class="fs-name">置信度加权</span>
+                <span class="fs-desc">按置信度分配权重</span>
+              </button>
+              <button class="fusion-strategy-btn" data-strategy="consensus">
+                <span class="fs-icon">🗳️</span>
+                <span class="fs-name">一致性投票</span>
+                <span class="fs-desc">多数派胜出</span>
+              </button>
+            </div>
+          </div>
+          <!-- 子模型选择 -->
+          <div class="fusion-section">
+            <div class="fusion-section-title">
+              <span>参与模型</span>
+              <span class="fusion-model-count" id="fusionModelCount">4个模型</span>
+            </div>
+            <div class="fusion-model-list" id="fusionModelList">
+              <!-- 动态填充 -->
+            </div>
+            <div class="fusion-model-actions">
+              <button class="fusion-action-btn" id="fusionSelectAll">全选</button>
+              <button class="fusion-action-btn" id="fusionSelectNone">全不选</button>
+              <button class="fusion-action-btn primary" id="fusionSmartRecommend">智能推荐</button>
+            </div>
+          </div>
+          <!-- 子模型权重分布预览 -->
+          <div class="fusion-section">
+            <div class="fusion-section-title">模型权重分布</div>
+            <div class="fusion-weight-bars" id="fusionWeightBars">
+              <!-- 动态填充 -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- v5.3 增强：组合预测（支持多算法切换） -->
+      <div id="comboPredSection" style="display:none;">
+        <!-- 算法切换标签（动态渲染） -->
+      </div>
+
+      <!-- v5.3 增强：位置号码预测（支持多算法切换） -->
+      <div id="positionPredSection" style="display:none;">
+        <!-- 算法切换标签 + 位置预测内容（动态渲染） -->
+      </div>
+
+      <!-- 连对连错统计 -->
+      <div class="streak-card" id="streakCard" style="display:none;">
+        <div class="streak-item" id="streakCurrent">
+          <div class="streak-num">0</div>
+          <div class="streak-label">当前连期</div>
+        </div>
+        <div class="streak-item win" id="streakMaxWin">
+          <div class="streak-num">0</div>
+          <div class="streak-label">最长连对</div>
+        </div>
+        <div class="streak-item lose" id="streakMaxLose">
+          <div class="streak-num">0</div>
+          <div class="streak-label">最长连错</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 分析页 -->
+    <div class="page" id="pageAnalysis" style="display:none;">
+      <!-- 分析子标签 -->
+      <div class="sub-tabs" id="analysisTabs">
+        <button class="sub-tab active" data-tab="freq">📊 频率</button>
+        <button class="sub-tab" data-tab="sum">📈 和值</button>
+        <button class="sub-tab" data-tab="bs">🎲 大小单双</button>
+        <button class="sub-tab" data-tab="period">⏰ 时段</button>
+        <button class="sub-tab" data-tab="luzhu">🔴 路珠</button>
+      </div>
+
+      <!-- 频率分析 -->
+      <div class="sub-page" id="subFreq">
+        <div class="section-title">号码频率分布</div>
+        <div class="slider-group">
+          <label>最近期数: <span id="freqNVal">100</span></label>
+          <input type="range" id="freqN" min="30" max="500" value="100" step="10">
+        </div>
+        <div class="freq-chart" id="freqChart"></div>
+        <div class="hot-cold">
+          <div class="hot-nums"><b>热号：</b><span id="hotNums"></span></div>
+          <div class="cold-nums"><b>冷号：</b><span id="coldNums"></span></div>
+        </div>
+      </div>
+
+      <!-- 和值分析 -->
+      <div class="sub-page" id="subSum" style="display:none;">
+        <div class="section-title">和值走势</div>
+        <div class="slider-group">
+          <label>最近期数: <span id="sumNVal">50</span></label>
+          <input type="range" id="sumN" min="20" max="200" value="50" step="10">
+        </div>
+        <div class="sum-chart" id="sumChart"></div>
+      </div>
+
+      <!-- 大小单双 -->
+      <div class="sub-page" id="subBs" style="display:none;">
+        <div class="section-title">大小单双分布</div>
+        <div class="bs-pies">
+          <div class="pie-card">
+            <div class="pie-title">大小</div>
+            <div class="pie-chart" id="pieDx"></div>
+          </div>
+          <div class="pie-card">
+            <div class="pie-title">单双</div>
+            <div class="pie-chart" id="pieDs"></div>
+          </div>
+          <div class="pie-card" id="pieComboCard" style="display:none;">
+            <div class="pie-title">四组合</div>
+            <div class="pie-chart" id="pieCombo"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- v5.0 新增：时段分析 -->
+      <div class="sub-page" id="subPeriod" style="display:none;">
+        <div class="section-title">时段走势分析</div>
+        <div class="period-info-card" id="periodInfoCard">
+          <div class="period-current">
+            <span class="period-label">当前时段</span>
+            <span class="period-name" id="currentPeriodName">-</span>
+          </div>
+          <div class="period-weekday">
+            <span class="period-label">今日星期</span>
+            <span class="period-name" id="currentWeekdayName">-</span>
+          </div>
+        </div>
+
+        <div class="section-subtitle">各时段大小分布</div>
+        <div class="period-grid" id="periodDxGrid">
+          <!-- 动态填充 -->
+        </div>
+
+        <div class="section-subtitle">各时段单双分布</div>
+        <div class="period-grid" id="periodDsGrid">
+          <!-- 动态填充 -->
+        </div>
+
+        <div class="section-subtitle">星期分布</div>
+        <div class="weekday-grid" id="weekdayGrid">
+          <!-- 动态填充 -->
+        </div>
+      </div>
+
+      <!-- 路珠分析 -->
+      <div class="sub-page" id="subLuzhu" style="display:none;">
+        <div class="section-title">路珠形态分析</div>
+        <div class="luzhu-controls">
+          <div class="radio-group">
+            <label><input type="radio" name="luzhuMode" value="大小" checked> 大小</label>
+            <label><input type="radio" name="luzhuMode" value="单双"> 单双</label>
+            <label id="luzhuComboLabel" style="display:none;"><input type="radio" name="luzhuMode" value="组合"> 组合</label>
+          </div>
+        </div>
+        <div class="slider-group">
+          <label>显示期数: <span id="luzhuNVal">50</span></label>
+          <input type="range" id="luzhuN" min="20" max="120" value="50" step="5">
+        </div>
+        <div class="luzhu-display" id="luzhuDisplay"></div>
+
+        <div class="pattern-query">
+          <div class="section-title-sm">形态查询</div>
+          <div class="slider-group">
+            <label>末尾形态长度: <span id="patLenVal">5</span></label>
+            <input type="range" id="patLen" min="3" max="7" value="5" step="1">
+          </div>
+          <div class="pat-tail" id="patTail"></div>
+          <input type="text" id="patInput" class="pat-input" placeholder="输入形态，如：大大小单">
+          <button class="btn-primary" id="patQueryBtn">查询下一期比例</button>
+          <div class="pat-result" id="patResult"></div>
+        </div>
+
+        <div class="adaptive-pred">
+          <div class="section-title-sm">自适应预测</div>
+          <div id="adaptiveResult" class="adaptive-result">-</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模型实验室页 -->
+    <div class="page" id="pageLab" style="display:none;">
+      <div class="section-title">🧪 模型实验室</div>
+      <p class="caption">模型按时间滚动验证；综合分不是未来中奖概率。p值经Bonferroni校正（α=0.05/8=0.00625）</p>
+
+      <div class="slider-group">
+        <label>最少训练期数: <span id="minHistVal">40</span></label>
+        <input type="range" id="minHist" min="30" max="120" value="40" step="10">
+      </div>
+
+      <div class="lab-tabs">
+        <button class="lab-tab active" data-cat="大小">大小</button>
+        <button class="lab-tab" data-cat="单双">单双</button>
+        <button class="lab-tab" data-cat="组合" id="labComboTab" style="display:none;">组合</button>
+      </div>
+
+      <div class="lab-table-container">
+        <table class="lab-table" id="labTable">
+          <thead>
+            <tr>
+              <th>模型</th>
+              <th>长期样本</th>
+              <th>长期准确率</th>
+              <th>显著</th>
+              <th>p值</th>
+              <th>综合分</th>
+            </tr>
+          </thead>
+          <tbody id="labTableBody">
+            <tr><td colspan="6" class="loading-text">计算中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="labBest" class="lab-best"></div>
+    </div>
+
+    <!-- v5.1 改造：战绩页（含总览/历史记录/开奖历史子标签） -->
+    <div class="page" id="pageStats" style="display:none;">
+      <div class="section-title">📈 我的战绩</div>
+
+      <!-- 战绩页子标签 -->
+      <div class="sub-tabs stats-tabs">
+        <button class="sub-tab active" data-stats-tab="overview">📊 总览</button>
+        <button class="sub-tab" data-stats-tab="history">✅ 预测历史</button>
+        <button class="sub-tab" data-stats-tab="draws">🎱 开奖历史</button>
+      </div>
+
+      <!-- 子标签1：总览 -->
+      <div class="stats-subpage" id="statsOverview">
+        <!-- 战绩总览卡片 -->
+        <div class="stats-overview">
+        <div class="overview-main">
+          <div class="overview-rate" id="overallRate">--</div>
+          <div class="overview-label">总体命中率</div>
+        </div>
+        <div class="overview-detail">
+          <div class="od-item">
+            <span class="od-val" id="statsTotal">0</span>
+            <span class="od-label">总预测</span>
+          </div>
+          <div class="od-item">
+            <span class="od-val ok" id="statsCorrect">0</span>
+            <span class="od-label">正确</span>
+          </div>
+          <div class="od-item">
+            <span class="od-val wrong" id="statsWrong">0</span>
+            <span class="od-label">错误</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 连对连错 -->
+      <div class="streak-card stats-streak">
+        <div class="streak-item">
+          <div class="streak-num" id="statsCurrentStreak">0</div>
+          <div class="streak-label" id="statsCurrentType">-</div>
+        </div>
+        <div class="streak-item win">
+          <div class="streak-num" id="statsMaxWin">0</div>
+          <div class="streak-label">最长连对</div>
+        </div>
+        <div class="streak-item lose">
+          <div class="streak-num" id="statsMaxLose">0</div>
+          <div class="streak-label">最长连错</div>
+        </div>
+      </div>
+
+      <!-- 分类命中率 -->
+      <div class="section-subtitle">分类命中率</div>
+      <div class="cat-rate-grid" id="catRateGrid">
+        <div class="cat-rate-card">
+          <div class="crc-name">大小</div>
+          <div class="crc-rate" id="rateDx">--</div>
+          <div class="crc-detail"><span id="rateDxDetail">0/0</span></div>
+        </div>
+        <div class="cat-rate-card">
+          <div class="crc-name">单双</div>
+          <div class="crc-rate" id="rateDs">--</div>
+          <div class="crc-detail"><span id="rateDsDetail">0/0</span></div>
+        </div>
+        <div class="cat-rate-card">
+          <div class="crc-name">组合</div>
+          <div class="crc-rate" id="rateZuhe">--</div>
+          <div class="crc-detail"><span id="rateZuheDetail">0/0</span></div>
+        </div>
+      </div>
+
+      <!-- 置信度准确率 -->
+      <div class="section-subtitle">置信度对应准确率</div>
+      <div class="conf-rate-grid" id="confRateGrid">
+        <div class="conf-rate-card">
+          <div class="crc-label strong">强烈推荐</div>
+          <div class="crc-val" id="confStrongRate">--</div>
+          <div class="crc-count" id="confStrongCount">0次</div>
+        </div>
+        <div class="conf-rate-card">
+          <div class="crc-label high">推荐</div>
+          <div class="crc-val" id="confHighRate">--</div>
+          <div class="crc-count" id="confHighCount">0次</div>
+        </div>
+        <div class="conf-rate-card">
+          <div class="crc-label medium">一般</div>
+          <div class="crc-val" id="confMediumRate">--</div>
+          <div class="crc-count" id="confMediumCount">0次</div>
+        </div>
+        <div class="conf-rate-card">
+          <div class="crc-label low">偏弱</div>
+          <div class="crc-val" id="confLowRate">--</div>
+          <div class="crc-count" id="confLowCount">0次</div>
+        </div>
+      </div>
+
+      <!-- 最近10期走势 -->
+      <div class="section-subtitle">最近走势</div>
+      <div class="recent-trend" id="recentTrend">
+        <!-- 动态填充最近10期的对错标记 -->
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="stats-actions">
+        <button class="btn btn-secondary" id="btnBackfillStats">📊 批量回填战绩</button>
+        <button class="btn btn-danger" id="btnResetStats">🗑️ 重置战绩</button>
+      </div>
+      </div>
+
+      <!-- 子标签2：预测历史 -->
+      <div class="stats-subpage" id="statsHistory" style="display:none;">
+        <p class="caption">根据自动对照的「倾向」与下期实际开奖比对。仅供复盘。</p>
+
+        <div class="filter-row">
+          <select id="filterCat">
+            <option value="全部">全部类型</option>
+          </select>
+          <select id="filterResult">
+            <option value="全部">全部结果</option>
+            <option value="对">✅ 对</option>
+            <option value="错">❌ 错</option>
+            <option value="待开">⏳ 待开</option>
+          </select>
+          <select id="filterWindow">
+            <option value="50">近50条</option>
+            <option value="100" selected>近100条</option>
+            <option value="300">近300条</option>
+            <option value="500">近500条</option>
+            <option value="1000">近1000条</option>
+          </select>
+        </div>
+
+        <div class="history-stats">
+          <div class="hist-stat"><span class="hs-val" id="hsTotal">0</span><span class="hs-label">记录</span></div>
+          <div class="hist-stat"><span class="hs-val" id="hsSettled">0</span><span class="hs-label">已验证</span></div>
+          <div class="hist-stat"><span class="hs-val hs-ok" id="hsOk">0</span><span class="hs-label">对</span></div>
+          <div class="hist-stat"><span class="hs-val hs-bad" id="hsBad">0</span><span class="hs-label">错</span></div>
+          <div class="hist-stat"><span class="hs-val" id="hsRate">0%</span><span class="hs-label">正确率</span></div>
+          <div class="hist-stat"><span class="hs-val" id="hsAdv">0pt</span><span class="hs-label">相对基准</span></div>
+        </div>
+
+        <div class="history-list" id="historyList">
+          <div class="empty-text">暂无预测记录</div>
+        </div>
+
+        <button class="btn btn-danger" id="clearHistoryBtn" style="width:100%;margin-top:12px;">清空本彩种预测记录</button>
+      </div>
+
+      <!-- 子标签3：开奖历史 -->
+      <div class="stats-subpage" id="statsDraws" style="display:none;">
+        <p class="caption">最近开奖号码记录。</p>
+
+        <div class="filter-row">
+          <select id="drawsWindow">
+            <option value="20">最近20期</option>
+            <option value="50" selected>最近50期</option>
+            <option value="100">最近100期</option>
+            <option value="200">最近200期</option>
+          </select>
+        </div>
+
+        <div class="draws-list" id="drawsList">
+          <div class="empty-text">加载中...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 历史记录页 -->
+    <div class="page" id="pageHistory" style="display:none;">
+      <div class="section-title">✅ 预测历史</div>
+      <p class="caption">根据自动对照的「倾向」与下期实际开奖比对。仅供复盘。</p>
+
+      <div class="filter-row">
+        <select id="filterCat">
+          <option value="全部">全部类型</option>
+        </select>
+        <select id="filterResult">
+          <option value="全部">全部结果</option>
+          <option value="对">✅ 对</option>
+          <option value="错">❌ 错</option>
+          <option value="待开">⏳ 待开</option>
+        </select>
+        <select id="filterWindow">
+          <option value="50">近50条</option>
+          <option value="100" selected>近100条</option>
+          <option value="300">近300条</option>
+          <option value="500">近500条</option>
+          <option value="1000">近1000条</option>
+        </select>
+      </div>
+
+      <div class="history-stats">
+        <div class="hist-stat"><span class="hs-val" id="hsTotal">0</span><span class="hs-label">记录</span></div>
+        <div class="hist-stat"><span class="hs-val" id="hsSettled">0</span><span class="hs-label">已验证</span></div>
+        <div class="hist-stat"><span class="hs-val hs-ok" id="hsOk">0</span><span class="hs-label">对</span></div>
+        <div class="hist-stat"><span class="hs-val hs-bad" id="hsBad">0</span><span class="hs-label">错</span></div>
+        <div class="hist-stat"><span class="hs-val" id="hsRate">0%</span><span class="hs-label">正确率</span></div>
+        <div class="hist-stat"><span class="hs-val" id="hsAdv">0pt</span><span class="hs-label">相对基准</span></div>
+      </div>
+
+      <div class="history-list" id="historyList">
+        <div class="empty-text">暂无预测记录</div>
+      </div>
+
+      <button class="btn-danger" id="clearHistoryBtn">清空本彩种预测记录</button>
+    </div>
+
+    <!-- 设置页 -->
+    <div class="page" id="pageSettings" style="display:none;">
+      <div class="section-title">⚙️ 设置</div>
+
+      <div class="settings-group">
+        <div class="setting-item">
+          <label class="switch-label">
+            <span>暗黑模式</span>
+            <label class="switch">
+              <input type="checkbox" id="darkModeSwitch">
+              <span class="slider-round"></span>
+            </label>
+          </label>
+        </div>
+        <div class="setting-item">
+          <label>拉取最近几天数据</label>
+          <div class="slider-group">
+            <span id="ftDaysVal">7</span>
+            <input type="range" id="ftDays" min="1" max="14" value="7" step="1">
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <label>分析最近期数</label>
+          <div class="slider-group">
+            <span id="nRecentVal">100</span>
+            <input type="range" id="nRecent" min="30" max="500" value="100" step="10">
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <label class="switch-label">
+            <span>实时自动刷新（5秒）</span>
+            <label class="switch">
+              <input type="checkbox" id="autoRefresh" checked>
+              <span class="slider-round"></span>
+            </label>
+          </label>
+        </div>
+      </div>
+
+      <!-- v4 新增：预测优化设置 -->
+      <div class="section-title">🎯 预测优化</div>
+      <div class="settings-group">
+        <div class="setting-item">
+          <label>预测窗口（近期数据量）</label>
+          <div class="slider-group">
+            <span id="predWindowVal">100</span>
+            <input type="range" id="predWindow" min="20" max="500" value="100" step="10">
+          </div>
+          <span class="setting-desc">使用最近多少期数据做预测。值越小越灵敏（变化快），值越大越稳定。</span>
+        </div>
+
+        <div class="setting-item">
+          <label>位置预测号码数量</label>
+          <div class="slider-group">
+            <span id="positionTopNVal">3</span>
+            <input type="range" id="positionTopN" min="1" max="10" value="3" step="1">
+          </div>
+          <span class="setting-desc">每个位置显示 Top N 个最可能出现的号码。</span>
+        </div>
+
+        <div class="setting-item">
+          <label class="switch-label">
+            <span>EWMA 自适应学习</span>
+            <label class="switch">
+              <input type="checkbox" id="ewmaEnabled" checked>
+              <span class="slider-round"></span>
+            </label>
+          </label>
+          <span class="setting-desc">根据近期各模型准确率动态调整权重，越用越准。</span>
+        </div>
+
+        <div class="setting-item">
+          <label>EWMA 灵敏度</label>
+          <div class="slider-group">
+            <span id="ewmaAlphaVal">0.25</span>
+            <input type="range" id="ewmaAlpha" min="0.05" max="0.5" value="0.25" step="0.05">
+          </div>
+          <span class="setting-desc">学习率越大，评分变化越快（激进）；越小越平滑（稳健）。</span>
+        </div>
+
+        <div class="setting-item">
+          <label>EWMA 权重锐度</label>
+          <div class="slider-group">
+            <span id="ewmaTempVal">0.08</span>
+            <input type="range" id="ewmaTemp" min="0.04" max="0.2" value="0.08" step="0.01">
+          </div>
+          <span class="setting-desc">锐度越高（值越小），好模型权重越大，预测变化越明显。</span>
+        </div>
+
+        <div class="setting-item">
+          <label class="switch-label">
+            <span>冷热趋势增强</span>
+            <label class="switch">
+              <input type="checkbox" id="trendBoostEnabled" checked>
+              <span class="slider-round"></span>
+            </label>
+          </label>
+          <span class="setting-desc">短窗口频率模型权重加倍，更快捕捉近期冷热趋势变化。</span>
+        </div>
+
+        <!-- v4.2 新增：灵敏度模式 -->
+        <div class="setting-item">
+          <label>灵敏度模式</label>
+          <div class="mode-selector">
+            <button class="mode-btn" data-mode="stable" id="modeStable">稳定</button>
+            <button class="mode-btn active" data-mode="balanced" id="modeBalanced">平衡</button>
+            <button class="mode-btn" data-mode="aggressive" id="modeAggressive">灵敏</button>
+          </div>
+          <span class="setting-desc">灵敏模式下预测变化更快更明显，稳定模式更平滑。</span>
+        </div>
+
+        <div class="setting-item">
+          <label>动量强度</label>
+          <div class="slider-group">
+            <span id="momentumStrengthVal">0.5</span>
+            <input type="range" id="momentumStrength" min="0" max="1" value="0.5" step="0.1">
+          </div>
+          <span class="setting-desc">利用近期表现趋势放大权重差异，值越大预测变化越明显。</span>
+        </div>
+
+        <div class="setting-item">
+          <label>反同质化强度</label>
+          <div class="slider-group">
+            <span id="antiHerdStrengthVal">0.3</span>
+            <input type="range" id="antiHerdStrength" min="0" max="1" value="0.3" step="0.1">
+          </div>
+          <span class="setting-desc">降低多数派模型权重，鼓励不同观点，让预测更容易变化。</span>
+        </div>
+
+        <div class="setting-item">
+          <label class="switch-label">
+            <span>连续相同衰减</span>
+            <label class="switch">
+              <input type="checkbox" id="streakDecayEnabled" checked>
+              <span class="slider-round"></span>
+            </label>
+          </label>
+          <span class="setting-desc">预测连续N期相同时自动降低权重，防止长期不变。</span>
+        </div>
+
+        <div class="setting-item">
+          <label class="switch-label">
+            <span>组合预测交叉特征</span>
+            <label class="switch">
+              <input type="checkbox" id="zuheCrossEnabled" checked>
+              <span class="slider-round"></span>
+            </label>
+          </label>
+          <span class="setting-desc">利用和值区间等交叉特征增强组合预测（样本不足时自动降权）。</span>
+        </div>
+      </div>
+
+      <!-- v5.1 新增：手动标记管理 -->
+      <div class="section-title" id="manualMarksSection">✍️ 手动标记管理</div>
+      <div class="settings-group">
+        <div class="setting-item">
+          <label>标记分类</label>
+          <select id="markCategory">
+            <option value="大小">大小</option>
+            <option value="单双">单双</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>当前形态</label>
+          <span class="setting-value" id="currentPattern">--</span>
+          <span class="setting-desc">最近5期走势形态</span>
+        </div>
+        <div class="setting-item">
+          <label>标记结果</label>
+          <div class="mark-result-btns" id="markResultBtns">
+            <button class="mark-btn" data-result="大">大</button>
+            <button class="mark-btn" data-result="小">小</button>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label>置信度</label>
+          <select id="markConfidence">
+            <option value="5">★★★★★ 非常确定</option>
+            <option value="4" selected>★★★★☆ 比较确定</option>
+            <option value="3">★★★☆☆ 一般</option>
+            <option value="2">★★☆☆☆ 不太确定</option>
+            <option value="1">★☆☆☆☆ 猜测</option>
+          </select>
+        </div>
+        <button class="btn-primary" id="addMarkBtn" style="width:100%;">➕ 添加标记</button>
+        <div class="setting-item" style="margin-top:8px;">
+          <label>已有标记</label>
+          <span class="setting-value" id="markCount">0 条</span>
+        </div>
+        <div class="marks-list" id="marksList">
+          <div class="empty-text">暂无标记</div>
+        </div>
+        <button class="btn-danger" id="clearMarksBtn" style="margin-top:8px;">清空本分类标记</button>
+      </div>
+
+      <div class="section-title">💾 离线数据库</div>
+      <div class="settings-group">
+        <div class="setting-item">
+          <label>本地历史数据</label>
+          <span class="setting-value" id="dbRecordCount">0 期</span>
+        </div>
+        <div class="setting-item">
+          <label>数据说明</label>
+          <span class="setting-desc">每次使用自动累积，永久保存在本机，断网也能用。样本越多预测越准。</span>
+        </div>
+        <button class="btn-primary" id="backfillBtn" style="margin-top:8px; width:100%;">📥 批量回填历史数据</button>
+        <div id="backfillProgress" style="display:none; margin-top:8px; max-height:150px; overflow-y:auto; background:rgba(0,0,0,0.05); border-radius:8px; padding:8px; font-size:12px;"></div>
+        <button class="btn-danger" id="clearDbBtn" style="margin-top:8px;">清空本彩种历史数据库</button>
+        <button class="btn-warning" id="clearAllDbBtn" style="margin-top:8px;">清空所有数据库</button>
+      </div>
+
+      <div class="section-title">📋 彩种列表</div>
+      <div class="lottery-list" id="lotteryList"></div>
+
+      <div class="section-title">ℹ️ 关于</div>
+      <div class="about-info">
+        <p>数据源：api.api16868.com</p>
+        <p>版本：v4.0 优化版</p>
+        <p>新功能：窗口化预测 · EWMA自适应学习 · 组合6项修复 · 位置预测可调 · 批量回填</p>
+        <p>仅供学习娱乐 · 请理性购彩</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- 底部导航栏 -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-page="home">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">首页</span>
+    </button>
+    <button class="nav-item" data-page="analysis">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">分析</span>
+    </button>
+    <button class="nav-item" data-page="stats">
+      <span class="nav-icon">📈</span>
+      <span class="nav-label">战绩</span>
+    </button>
+    <button class="nav-item" data-page="lab">
+      <span class="nav-icon">🧪</span>
+      <span class="nav-label">实验室</span>
+    </button>
+    <button class="nav-item" data-page="settings">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">设置</span>
+    </button>
+  </nav>
+
+  <!-- 脚本 -->
+  <script src="js/config.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/ewma.js"></script>
+  <!-- v5.2 新增：高级算法模型库（需在 predictors.js 之前加载） -->
+  <script src="js/advanced_models.js"></script>
+  <!-- v5.2 新增：智能融合引擎（需在 predictors.js 之前加载） -->
+  <script src="js/fusion.js"></script>
+  <script src="js/predictors.js"></script>
+  <!-- v5.3 新增：扩展预测器（位置+组合多算法） -->
+  <script src="js/predictors_multi.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/period.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/cache.js"></script>
+  <script src="js/adapters.js"></script>
+  <script src="js/app.js"></script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

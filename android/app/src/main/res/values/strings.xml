@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">彩析</string>
+    <string name="title_activity_main">彩析</string>
+    <string name="package_name">com.cai31.analyze</string>
+    <string name="custom_url_scheme">com.cai31.analyze</string>
+</resources>

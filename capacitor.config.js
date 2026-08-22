@@ -1,0 +1,1 @@
+const config = require('@capacitor/cli').CapacitorConfig; module.exports = { appId: 'com.cai31.analyze', appName: '彩析', webDir: 'www', server: { androidScheme: 'https' }, android: { buildOptions: { keystorePath: '', keystoreAlias: '', keystorePassword: '', keystoreAliasPassword: '' } } };
