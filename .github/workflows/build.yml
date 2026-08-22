@@ -1,6 +1,5 @@
 name: Build APK
 
-# 触发方式:推送到仓库 或 手动在 Actions 页点 Run workflow
 on:
   push:
   workflow_dispatch:
@@ -8,10 +7,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # 项目根目录是 quant-app/,请把整个 quant-app 文件夹推到仓库根目录
-    defaults:
-      run:
-        working-directory: quant-app
 
     steps:
       - name: Checkout
@@ -28,12 +23,12 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: 构建 Debug APK(可直接安装)
+      - name: 构建 Debug APK
         run: gradle assembleDebug
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
           name: quant-app-debug
-          path: quant-app/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
